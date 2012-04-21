@@ -4,6 +4,7 @@
 
 #include <sys/select.h>
 #include <sys/types.h>
+#include <pthread.h>
 #include <unistd.h>
 #include <string>
 
@@ -14,6 +15,8 @@
 
 kap_t kap;
 void *kauxhdl;
+pthread_mutex_t sync;
+pthread_t th_listen;
 
 namespace woolnet {
 	woolnet_serv_t *(*serv_listen)(int port);
@@ -56,16 +59,18 @@ int keh_init(kap_t k, ppackage aux)
 	kaux_setobj(kauxhdl, NULL);
 	kaux_settyp(kauxhdl, NULL);
 	
+	sync = PTHREAD_MUTEX_INITIALIZER;
+	
 	ppackage woolfs = kap.knock(ppfuncs("::woolnet"));
 	if (woolfs.type != 'd') return ERRNCARE;
 	woolnet::serv_accept =   (int             (*)(woolnet_serv_t *, woolnet_clnt_t *, unsigned int *))(fsget((mfunc_t*)woolfs.d.data, "serv_accept"));
 	woolnet::serv_listen =   (woolnet_serv_t *(*)(int port))                   fsget((mfunc_t*)woolfs.d.data, "serv_listen");
-	woolnet::serv_fd =       (int(*)(woolnet_serv_t*))                         fsget((mfunc_t*)woolfs.d.data, "serv_fd");
+	woolnet::serv_fd =       (int             (*)(woolnet_serv_t*))            fsget((mfunc_t*)woolfs.d.data, "serv_fd");
 	woolnet::serv_shut =     (int             (*)(woolnet_serv_t*))            fsget((mfunc_t*)woolfs.d.data, "serv_shut");
 	woolnet::clnt_connect =  (woolnet_clnt_t *(*)(char*, int, char*, char*))   fsget((mfunc_t*)woolfs.d.data, "clnt_connect");
-	woolnet::clnt_fd =       (int(*)(woolnet_clnt_t*))                         fsget((mfunc_t*)woolfs.d.data, "clnt_fd");
+	woolnet::clnt_fd =       (int             (*)(woolnet_clnt_t*))            fsget((mfunc_t*)woolfs.d.data, "clnt_fd");
 	woolnet::clnt_shut =     (int             (*)(woolnet_clnt_t*))            fsget((mfunc_t*)woolfs.d.data, "clnt_shut");
-	woolnet::prot_maxlen =   (int             (*)())                           fsget((mfunc_t*)woolfs.d.data, "prot_maxlen");
+	woolnet::prot_maxlen =   (int(*)())                                        fsget((mfunc_t*)woolfs.d.data, "prot_maxlen");
 	woolnet::pack_clogin =   (int(*)(unsigned char*, char[32], char[32]))      fsget((mfunc_t*)woolfs.d.data, "pack_clogin");
 	woolnet::pack_close =    (int(*)(unsigned char*, char[128]))               fsget((mfunc_t*)woolfs.d.data, "pack_close");
 	woolnet::pack_key =      (int(*)(unsigned char*, int, int))                fsget((mfunc_t*)woolfs.d.data, "pack_key");
@@ -92,6 +97,68 @@ ppackage keh_knock(ppackage in)
 	else return kaux_pass(kauxhdl, in);
 }
 
+void *f_listen(void* arg)
+{
+	woolnet_clnt_t *self = (woolnet_clnt_t*)arg;
+	if (!arg) return NULL;
+	
+	void *buf = (void*)new char[woolnet::prot_maxlen()];
+	int len;
+	
+	while (1)
+	{
+		printf("DBG [youput f_listen(..)] sleeping 10k us..\n");
+		usleep(10000);
+		len = woolnet::wrap_crecv(self, buf, woolnet::prot_maxlen());
+		if (len <= 0) {
+			printf("DBG [youput f_listen(..)] Failed to recv..\n");
+			continue;
+		}
+		
+		unsigned char packtype = ((unsigned char*)buf)[0];
+		switch (packtype)
+		{
+		case PACK_KEY:
+			pthread_mutex_lock(&sync);
+			int special;
+			int key;
+			woolnet::pack_unkey(buf, &special, &key);
+			if (special != 0) {
+				printf("[youput f_listen(..) unkey] only special=0 supportd\n");
+				pthread_mutex_unlock(&sync);
+				continue;
+			}
+			putchar(key);
+			
+			pthread_mutex_unlock(&sync);
+			continue;
+			
+		case PACK_PING:
+			pthread_mutex_lock(&sync);
+			
+			// dafuq ?
+			
+			pthread_mutex_unlock(&sync);
+			continue;
+			
+		case PACK_CLOSE:
+			pthread_mutex_lock(&sync);
+			printf("[youput f_listen(..)] received CLOSE, bye!\n");
+			exit(0);
+			pthread_mutex_unlock(&sync);
+			continue;
+			
+		default:
+			printf("DBG [youput f_listen(..)] Received wrong packtype\n");
+			continue;
+		}
+		
+	}
+	
+	
+	return NULL;
+}
+
 int main(int argc, char **args)
 {
 	char *host = "localhost";
@@ -101,13 +168,12 @@ int main(int argc, char **args)
 	woolnet_clnt_t *clnt;
 	void *buf = (void*)new char[woolnet::prot_maxlen()];
 	fd_set evr, ev; // stdin and connection
-	
-	ev = FD_ZERO(&ev);
-	
+
+	FD_ZERO(&ev);
+	FD_ZERO(&evr);
 	
 	printf("User: %s\n", username);
-	printf("Pwrd: ");
-	std::string password = "";
+	printf("Pwrd: %s", "*");
 	
 	
 	
@@ -120,7 +186,6 @@ int main(int argc, char **args)
 	}
 	
 	printf("[youput main(..)] You're on terminal number %i\n\n", clnt->termn);
-	
 	
 	
 	
