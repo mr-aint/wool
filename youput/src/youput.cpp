@@ -15,7 +15,7 @@
 
 kap_t kap;
 void *kauxhdl;
-pthread_mutex_t sync;
+pthread_mutex_t keysync;
 pthread_t th_listen;
 
 namespace woolnet {
@@ -59,7 +59,7 @@ int keh_init(kap_t k, ppackage aux)
 	kaux_setobj(kauxhdl, NULL);
 	kaux_settyp(kauxhdl, NULL);
 	
-	sync = PTHREAD_MUTEX_INITIALIZER;
+	keysync = PTHREAD_MUTEX_INITIALIZER;
 	
 	ppackage woolfs = kap.knock(ppfuncs("::woolnet"));
 	if (woolfs.type != 'd') return ERRNCARE;
@@ -109,7 +109,7 @@ void *f_listen(void* arg)
 	{
 		printf("DBG [youput f_listen(..)] sleeping 10k us..\n");
 		usleep(10000);
-		len = woolnet::wrap_crecv(self, buf, woolnet::prot_maxlen());
+		len = woolnet::wrap_crecv(self, buf, woolnet::prot_maxlen()); // BLOCK
 		if (len <= 0) {
 			printf("DBG [youput f_listen(..)] Failed to recv..\n");
 			continue;
@@ -119,33 +119,32 @@ void *f_listen(void* arg)
 		switch (packtype)
 		{
 		case PACK_KEY:
-			pthread_mutex_lock(&sync);
+			pthread_mutex_lock(&keysync);
 			int special;
 			int key;
-			woolnet::pack_unkey(buf, &special, &key);
+			woolnet::pack_unkey((unsigned char*)buf, &special, &key);
 			if (special != 0) {
 				printf("[youput f_listen(..) unkey] only special=0 supportd\n");
-				pthread_mutex_unlock(&sync);
+				pthread_mutex_unlock(&keysync);
 				continue;
 			}
 			putchar(key);
-			
-			pthread_mutex_unlock(&sync);
+			pthread_mutex_unlock(&keysync);
 			continue;
 			
 		case PACK_PING:
-			pthread_mutex_lock(&sync);
+			pthread_mutex_lock(&keysync);
 			
 			// dafuq ?
 			
-			pthread_mutex_unlock(&sync);
+			pthread_mutex_unlock(&keysync);
 			continue;
 			
 		case PACK_CLOSE:
-			pthread_mutex_lock(&sync);
+			pthread_mutex_lock(&keysync);
 			printf("[youput f_listen(..)] received CLOSE, bye!\n");
 			exit(0);
-			pthread_mutex_unlock(&sync);
+			pthread_mutex_unlock(&keysync);
 			continue;
 			
 		default:
@@ -155,7 +154,7 @@ void *f_listen(void* arg)
 		
 	}
 	
-	
+	// wont get to this point actually..
 	return NULL;
 }
 
@@ -167,15 +166,9 @@ int main(int argc, char **args)
 	char passwd[32] = "imacakepw"; // TODO seriously, hardcoded password......!
 	woolnet_clnt_t *clnt;
 	void *buf = (void*)new char[woolnet::prot_maxlen()];
-	fd_set evr, ev; // stdin and connection
-
-	FD_ZERO(&ev);
-	FD_ZERO(&evr);
 	
 	printf("User: %s\n", username);
 	printf("Pwrd: %s", "*");
-	
-	
 	
 	printf("[youput main(..)] Connecting as '%s'..\n", username);
 	
@@ -185,8 +178,29 @@ int main(int argc, char **args)
 		exit(-1);
 	}
 	
+	pthread_mutex_lock(&keysync);
+	pthread_create(&th_listen, NULL, f_listen, clnt);
+	
+	
 	printf("[youput main(..)] You're on terminal number %i\n\n", clnt->termn);
 	
+	pthread_mutex_unlock(&keysync);
+	
+	int c;
+	while (1)
+	{
+		c = getchar();
+		pthread_mutex_lock(&keysync);
+		if (c==EOF) exit(0);
+		
+		int len = woolnet::pack_key((unsigned char*)buf, 0, c);
+		int sent = woolnet::wrap_csend(clnt, buf, len);
+		if (sent != len) {
+			printf("[youput main(..)] Sending key failed..\n");
+		}
+		
+		pthread_mutex_unlock(&keysync);
+	}
 	
 	
 	return OKAY;
