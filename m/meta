@@ -1,2 +1,2 @@
-::main libyouput.so
-::woolnet libwoolnet.so
+youput libyouput.so
+woolnet libwoolnet.so
