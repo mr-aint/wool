@@ -1,4 +1,4 @@
-// youput.cpp -- woolnet client
+// youput.cpp -- woolnet client main module
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -45,6 +45,8 @@ namespace woolnet {
 	int (*wrap_sclose)(woolnet_serv_t *serv);
 	int (*wrap_cclose)(woolnet_clnt_t *clnt);
 }
+
+extern "C" {
 
 int main(int argc, char **args);
 static const mfunc_t funcs[] = {
@@ -214,7 +216,7 @@ int main(int argc, char **args)
 
 
 
-
+}
 
 
 

@@ -1,2 +1,7 @@
-youput libyouput.so
-woolnet libwoolnet.so
+youput youput
+woolnet woolnet
+servant servant
+wool wool
+lib lib
+# all the various libraries go here
+libpthread libpthread

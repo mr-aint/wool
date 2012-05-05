@@ -26,33 +26,32 @@ kap_t kap;
 void *kauxhdl;
 
 extern "C" {
-	woolnet_serv_t *serv_listen(int port);
-	int             serv_accept(woolnet_serv_t *serv, sockaddr_in *client, unsigned int *len);
-	int             serv_fd(woolnet_serv_t *self);
-	int             serv_shut(woolnet_serv_t *serv);
-	
-	woolnet_clnt_t *clnt_connect(char *host, int port, char *username, char *passw);
-	int             clnt_fd(woolnet_clnt_t *self);
-	int             clnt_shut(woolnet_clnt_t *self);
+woolnet_serv_t *serv_listen(int port);
+int             serv_accept(woolnet_serv_t *serv, sockaddr_in *client, unsigned int *len);
+int             serv_fd(woolnet_serv_t *self);
+int             serv_shut(woolnet_serv_t *serv);
 
-	int prot_maxlen();
-	int pack_clogin(unsigned char *into, char username[32], char passwd[32]);
-	int pack_slogin(unsigned char *into, int ret, int termn);
-	int pack_key(unsigned char *into, int special, int code);
-	int pack_close(unsigned char *into, char reason[128]);
-	int pack_unclogin(unsigned char *from, char *username[32], char *passwd[32]);
-	int pack_unslogin(unsigned char *from, int *ret, int *termn);
-	int pack_unkey(unsigned char *from, int *special, int *code);
-	int pack_unclose(unsigned char *from, char *reason[128]);
-	
-	int wrap_ssend(woolnet_serv_t *serv, void *buf, size_t len);
-	int wrap_csend(woolnet_clnt_t *clnt, void *buf, size_t len);
-	int wrap_srecv(woolnet_serv_t *serv, void *buf, size_t len);
-	int wrap_crecv(woolnet_clnt_t *clnt, void *buf, size_t len);
-	int wrap_sclose(woolnet_serv_t *serv);
-	int wrap_cclose(woolnet_clnt_t *clnt);
+woolnet_clnt_t *clnt_connect(char *host, int port, char *username, char *passw);
+int             clnt_fd(woolnet_clnt_t *self);
+int             clnt_shut(woolnet_clnt_t *self);
 
-}
+int prot_maxlen();
+int pack_clogin(unsigned char *into, char username[32], char passwd[32]);
+int pack_slogin(unsigned char *into, int ret, int termn);
+int pack_key(unsigned char *into, int special, int code);
+int pack_close(unsigned char *into, char reason[128]);
+int pack_unclogin(unsigned char *from, char *username[32], char *passwd[32]);
+int pack_unslogin(unsigned char *from, int *ret, int *termn);
+int pack_unkey(unsigned char *from, int *special, int *code);
+int pack_unclose(unsigned char *from, char *reason[128]);
+
+int wrap_ssend(woolnet_serv_t *serv, void *buf, size_t len);
+int wrap_csend(woolnet_clnt_t *clnt, void *buf, size_t len);
+int wrap_srecv(woolnet_serv_t *serv, void *buf, size_t len);
+int wrap_crecv(woolnet_clnt_t *clnt, void *buf, size_t len);
+int wrap_sclose(woolnet_serv_t *serv);
+int wrap_cclose(woolnet_clnt_t *clnt);
+
 static const mfunc_t funcs[] = {
 		{(fptr_t)serv_listen,             "serv_listen"},
 		{(fptr_t)serv_accept,             "serv_accept"},
@@ -340,6 +339,7 @@ int wrap_cclose(woolnet_serv_t *clnt) {
 }
 
 
+}
 
 
 
