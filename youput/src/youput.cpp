@@ -88,7 +88,7 @@ int keh_init(kap_t k, ppackage aux)
 	woolnet::wrap_srecv =    (int(*)(woolnet_serv_t*, void*, size_t))          fsget((mfunc_t*)woolfs.d.data, "wrap_srecv");
 	woolnet::wrap_ssend =    (int(*)(woolnet_serv_t*, void*, size_t))          fsget((mfunc_t*)woolfs.d.data, "wrap_ssend");
 	
-	printf("DBG [youput keh_init(..)] pick clnt_connect=%p\n", woolnet::clnt_connect);
+	//printf("DBG [youput keh_init(..)] pick clnt_connect=%p\n", woolnet::clnt_connect);
 	
 	return OKAY;
 }
@@ -170,7 +170,7 @@ int main(int argc, char **args)
 	void *buf = (void*)new char[woolnet::prot_maxlen()];
 	
 	printf("User: %s\n", username);
-	printf("Pwrd: %s", "*");
+	printf("Pwrd: %s\n", "*");
 	
 	printf("[youput main(..)] Connecting as '%s'..\n", username);
 	

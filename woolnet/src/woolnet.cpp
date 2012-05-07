@@ -26,8 +26,9 @@ kap_t kap;
 void *kauxhdl;
 
 extern "C" {
+
 woolnet_serv_t *serv_listen(int port);
-int             serv_accept(woolnet_serv_t *serv, sockaddr_in *client, unsigned int *len);
+int             serv_accept(woolnet_serv_t *serv, woolnet_clnt_t *client, unsigned int *len);
 int             serv_fd(woolnet_serv_t *self);
 int             serv_shut(woolnet_serv_t *serv);
 
@@ -72,12 +73,12 @@ static const mfunc_t funcs[] = {
 		{(fptr_t)pack_unkey,              "pack_unkey"},
 		{(fptr_t)pack_unclose,            "pack_unclose"},
 
-		{(fptr_t)wrap_ssend,              "warp_ssend"},
-		{(fptr_t)wrap_srecv,              "warp_srecv"},
-		{(fptr_t)wrap_sclose,             "warp_sclose"},
-		{(fptr_t)wrap_csend,              "warp_csend"},
-		{(fptr_t)wrap_crecv,              "warp_crecv"},
-		{(fptr_t)wrap_cclose,             "warp_cclose"},
+		{(fptr_t)wrap_ssend,              "wrap_ssend"},
+		{(fptr_t)wrap_srecv,              "wrap_srecv"},
+		{(fptr_t)wrap_sclose,             "wrap_sclose"},
+		{(fptr_t)wrap_csend,              "wrap_csend"},
+		{(fptr_t)wrap_crecv,              "wrap_crecv"},
+		{(fptr_t)wrap_cclose,             "wrap_cclose"},
 		{NULL,                            NULL},
 };
 int keh_init(kap_t k, ppackage aux)
@@ -141,10 +142,12 @@ woolnet_serv_t *serv_listen(int port)
 	
 	return serv;
 }
-// direct wrapper for POSIX accept()
-int serv_accept(woolnet_serv_t *serv, sockaddr_in *client, unsigned int *len)
+// returns sockfd of client, writes essential information into nullar &client.
+// make len be a pointer to empty unsigned int, because POSIX accept(..) reqs.!
+// This does not perform any additional networking/packetint! (direct wrapper)
+int serv_accept(woolnet_serv_t *serv, woolnet_clnt_t *client, unsigned int *len)
 {
-	return accept(serv->sodex, (sockaddr*)client, len);
+	return (client->sodex=accept(serv->sodex, (sockaddr*)(client->saddr), len));
 }
 // get filedescriptor of socket
 int serv_fd(woolnet_serv_t *self) { return self?self->sodex:NULL; }
@@ -190,6 +193,9 @@ woolnet_clnt_t *clnt_connect(char *host, int port, char *username, char *passw)
 		memcpy(&saddr->sin_addr, hostinfo->h_addr, 
 				hostinfo->h_length);
 	}
+	
+	saddr->sin_family = AF_INET;
+	saddr->sin_port = htons(port);
 	
 	if (connect(clnt->sodex,(sockaddr*)saddr,sizeof(sockaddr_in))<0) {
 		printf("[woolnet clnt_connect(..)] Failed to connect TCP\n");
@@ -328,13 +334,13 @@ int wrap_csend(woolnet_clnt_t *clnt, void *buf, size_t len) {
 int wrap_srecv(woolnet_serv_t *serv, void *buf, size_t len) {
 	return recv(serv->sodex, buf, len, 0);
 }
-int wrap_crecv(woolnet_serv_t *clnt, void *buf, size_t len) {
+int wrap_crecv(woolnet_clnt_t *clnt, void *buf, size_t len) {
 	return recv(clnt->sodex, buf, len, 0);
 }
 int wrap_sclose(woolnet_serv_t *serv) {
 	return close(serv->sodex);
 }
-int wrap_cclose(woolnet_serv_t *clnt) {
+int wrap_cclose(woolnet_clnt_t *clnt) {
 	return close(clnt->sodex);
 }
 
