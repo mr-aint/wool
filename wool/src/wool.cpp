@@ -34,10 +34,10 @@ namespace woolnet {
 	int (*pack_slogin)(unsigned char *into, int ret, int termn);
 	int (*pack_key)(unsigned char *into, int special, int code);
 	int (*pack_close)(unsigned char *into, char reason[128]);
-	int (*pack_unclogin)(unsigned char *from, char *username[32], char *passwd[32]);
+	int (*pack_unclogin)(unsigned char *from, char *username, char *passwd);
 	int (*pack_unslogin)(unsigned char *from, int *ret, int *termn);
 	int (*pack_unkey)(unsigned char *from, int *special, int *code);
-	int (*pack_unclose)(unsigned char *from, char *reason[128]);
+	int (*pack_unclose)(unsigned char *from, char *reason);
 	
 	int (*wrap_ssend )(woolnet_serv_t *serv, void *buf, size_t len);
 	int (*wrap_csend )(woolnet_clnt_t *clnt, void *buf, size_t len);
@@ -75,8 +75,8 @@ extern "C" int keh_init(kap_t k, ppackage aux)
 	woolnet::pack_close =    (int(*)(unsigned char*, char[128]))               fsget((mfunc_t*)woolfs.d.data, "pack_close");
 	woolnet::pack_key =      (int(*)(unsigned char*, int, int))                fsget((mfunc_t*)woolfs.d.data, "pack_key");
 	woolnet::pack_slogin =   (int(*)(unsigned char*, int, int))                fsget((mfunc_t*)woolfs.d.data, "pack_slogin");
-	woolnet::pack_unclogin = (int(*)(unsigned char*, char*[32], char*[32]))    fsget((mfunc_t*)woolfs.d.data, "pack_unclogin");
-	woolnet::pack_unclose =  (int(*)(unsigned char*, char*[128]))              fsget((mfunc_t*)woolfs.d.data, "pack_unclose");
+	woolnet::pack_unclogin = (int(*)(unsigned char*, char*, char*))            fsget((mfunc_t*)woolfs.d.data, "pack_unclogin");
+	woolnet::pack_unclose =  (int(*)(unsigned char*, char*))                   fsget((mfunc_t*)woolfs.d.data, "pack_unclose");
 	woolnet::pack_unkey =    (int(*)(unsigned char*, int*, int*))              fsget((mfunc_t*)woolfs.d.data, "pack_unkey");
 	woolnet::pack_unslogin = (int(*)(unsigned char*, int*, int*))              fsget((mfunc_t*)woolfs.d.data, "pack_unslogin");
 	woolnet::wrap_cclose =   (int(*)(woolnet_clnt_t*))                         fsget((mfunc_t*)woolfs.d.data, "wrap_cclose");
@@ -106,6 +106,7 @@ extern "C" int main(int argc, char **args)
 	}
 	
 	unsigned char *buf = new unsigned char[woolnet::prot_maxlen()];
+	unsigned char *bufcur; // current position in buffer
 	size_t len;
 	woolnet_clnt_t *sample_client = new woolnet_clnt_t();
 	unsigned int blah_len;
@@ -128,40 +129,62 @@ extern "C" int main(int argc, char **args)
 	}
 	char *username = new char[32];
 	char *password = new char[32];
-	woolnet::pack_unclogin(buf, &username, &password);
+	woolnet::pack_unclogin(buf, username, password);
 	printf("[wool main(..)] Client '%s' with password '%s'\n", username, password);
 	len = woolnet::pack_slogin(buf, PRET_OKAY, 12);
 	woolnet::wrap_csend(sample_client, buf, len);
 	
+	int red; // amount of used bytes by certain package (advnace bufcur by this)
+	red = 0;
+	bufcur = NULL;
 	
 	while (1)
 	{
-		len = woolnet::wrap_crecv(sample_client, buf, woolnet::prot_maxlen());
-		if (len<=0) {
-			printf("[wool main(..)] wrap_crecv failed\n");
-			continue;
+		bufcur += red;
+		//printf("[wool main(..)] red=%03i buf=%p bufcur=%p\n", red, buf, bufcur);
+		red = 0;
+		if (!bufcur || bufcur >= buf+len) { // next eventually big piece of data
+			len = woolnet::wrap_crecv(sample_client, buf, woolnet::prot_maxlen());
+			bufcur = buf;
+			if (len<=0) {
+				printf("[wool main(..)] wrap_crecv failed\n");
+				usleep(1000000);
+				continue;
+			}
+			//printf("[wool main(..) << DATA] len=%i\n", len);
 		}
-		unsigned char type = buf[0]; // get first byte
+		
+		unsigned char type = bufcur[0]; // typechar
 		switch (type) {
 		case PACK_KEY:
 			int special, key;
-			woolnet::pack_unkey(buf, &special, &key);
+			woolnet::pack_unkey(bufcur, &special, &key);
+			red = woolnet::pack_key(NULL, 0, 0);
 			if (special != 0) {
 				printf("[wool main(..) << PACK_KEY] special!=0 not supprted\n");
 				continue;
 			}
+			//printf("key: (0x%02x) %c\n", key, key);
+			//printf("[wool main(..) << PACK_KEY] 0x%02x key\n", key);
 			putchar(key);
 			continue;
 			
 		case PACK_PING:
+			printf("WRN [wool main(..) << PACK_PING] ping package not defined... :3\n");
+			red = 1;
 			continue;
 			
 		case PACK_CLOSE:
 			printf("[wool main(..) << PACK_CLOSE] from sample_client\n");
+			char reason[128];
+			woolnet::pack_unclose(bufcur, reason);
+			red = woolnet::pack_close(NULL, NULL);
 			continue;
 			
 		default:
-			printf("[wool main(..) << PACK_???] Unknown packtype 0x%02x\n");
+			printf("[wool main(..) << PACK_???] Unknown packtype 0x%02x\n", type);
+			red = 1;
+			//usleep(1000000);
 			continue;
 		}
 	}

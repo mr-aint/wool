@@ -41,10 +41,10 @@ int pack_clogin(unsigned char *into, char username[32], char passwd[32]);
 int pack_slogin(unsigned char *into, int ret, int termn);
 int pack_key(unsigned char *into, int special, int code);
 int pack_close(unsigned char *into, char reason[128]);
-int pack_unclogin(unsigned char *from, char *username[32], char *passwd[32]);
+int pack_unclogin(unsigned char *from, char *username, char *passwd);
 int pack_unslogin(unsigned char *from, int *ret, int *termn);
 int pack_unkey(unsigned char *from, int *special, int *code);
-int pack_unclose(unsigned char *from, char *reason[128]);
+int pack_unclose(unsigned char *from, char *reason);
 
 int wrap_ssend(woolnet_serv_t *serv, void *buf, size_t len);
 int wrap_csend(woolnet_clnt_t *clnt, void *buf, size_t len);
@@ -150,7 +150,7 @@ int serv_accept(woolnet_serv_t *serv, woolnet_clnt_t *client, unsigned int *len)
 	return (client->sodex=accept(serv->sodex, (sockaddr*)(client->saddr), len));
 }
 // get filedescriptor of socket
-int serv_fd(woolnet_serv_t *self) { return self?self->sodex:NULL; }
+int serv_fd(woolnet_serv_t *self) { return self?self->sodex:0; }
 // stops listening and destructs (free(..)) handle. (if returns ERR handle aliv)
 int serv_shut(woolnet_serv_t *serv)
 {
@@ -243,7 +243,7 @@ int prot_maxlen() { return 256; }
 // username 31 chars + NUL, passwd the same. into must be at least prot_maxlen()
 int pack_clogin(unsigned char *into, char username[32], char passwd[32])
 {
-	if (!into) return 0;
+	if (!into) return 1+32+32;
 	into[0] = PACK_CLOGIN;
 	
 	memset(into+1, 0, 32*2);
@@ -255,29 +255,32 @@ int pack_clogin(unsigned char *into, char username[32], char passwd[32])
 // ret is retcode, termn is the terminal number. currently useless
 int pack_slogin(unsigned char *into, int ret, int termn)
 {
-	if (!into) return 0;
+	if (!into) return 1+8+8;
 	into[0] = PACK_SLOGIN;
 	
-	memcpy(into+1, &ret, sizeof(ret));                 // at 1, 8 bytes
-	memcpy(into+1+sizeof(ret), &termn, sizeof(termn)); // at 9, 8 bytes
+	memcpy(into+1, &ret, 8);
+	memcpy(into+1+8, &termn, 8);
+	
+	//memcpy(into+1, &ret, sizeof(ret));                 // at 1, 8 bytes
+	//memcpy(into+1+sizeof(ret), &termn, sizeof(termn)); // at 9, 8 bytes
 	
 	return 1+8+8;
 }
 // for now you can ignore special.
 int pack_key(unsigned char *into, int special, int code)
 {
-	if (!into) return 0;
+	if (!into) return 1+8+8;
 	into[0] = PACK_KEY;
 	
-	memcpy(into+1, &special, sizeof(special));           // at 1, 8 bytes
-	memcpy(into+1+sizeof(special), &code, sizeof(code)); // at 9, 8 bytes
+	memcpy(into+1, &special, 8);           // at 1, 8 bytes
+	memcpy(into+1+8, &code, 8); // at 9, 8 bytes
 	
 	return 1+8+8;
 }
 // reason is human readable as you can see.
 int pack_close(unsigned char *into, char reason[128])
 {
-	if (!into) return 0;
+	if (!into) return 1+128;
 	into[0] = PACK_CLOSE;
 	
 	memcpy(into+1, reason, 128);
@@ -285,7 +288,8 @@ int pack_close(unsigned char *into, char reason[128])
 	return 1+128;
 }
 
-int pack_unclogin(unsigned char *from, char *username[32], char *passwd[32])
+// username and passwd at least 32bytes each.
+int pack_unclogin(unsigned char *from, char *username, char *passwd)
 {
 	if (!from) return ERRRUBBISH;
 	if (from[0] != PACK_CLOGIN) return ERRRUBBISH;
@@ -315,7 +319,7 @@ int pack_unkey(unsigned char *from, int *special, int *code)
 	
 	return OKAY;
 }
-int pack_unclose(unsigned char *from, char *reason[128])
+int pack_unclose(unsigned char *from, char *reason)
 {
 	if (!from) return ERRRUBBISH;
 	if (from[0] != PACK_CLOGIN) return ERRRUBBISH;

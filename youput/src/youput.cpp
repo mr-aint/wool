@@ -109,8 +109,7 @@ void *f_listen(void* arg)
 	
 	while (1)
 	{
-		printf("DBG [youput f_listen(..)] sleeping 10k us..\n");
-		usleep(10000);
+		usleep(1000000);
 		len = woolnet::wrap_crecv(self, buf, woolnet::prot_maxlen()); // BLOCK
 		if (len <= 0) {
 			printf("DBG [youput f_listen(..)] Failed to recv..\n");
@@ -192,6 +191,7 @@ int main(int argc, char **args)
 	while (1)
 	{
 		c = getchar();
+		//printf("DBG [youput main(..)] Gonna send %02x char..\n", c);
 		pthread_mutex_lock(&keysync);
 		if (c==EOF) exit(0);
 		
