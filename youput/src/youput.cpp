@@ -63,7 +63,7 @@ int keh_init(kap_t k, ppackage aux)
 	
 	keysync = PTHREAD_MUTEX_INITIALIZER;
 	
-	ppackage woolfs = kap.knock(ppfuncs("::woolnet"));
+	ppackage woolfs = kap.knock(ppfuncs("::woolnet"), NULL);
 	if (woolfs.type != 'd') return ERRNCARE;
 	woolnet::serv_accept =   (int             (*)(woolnet_serv_t *, woolnet_clnt_t *, unsigned int *))(fsget((mfunc_t*)woolfs.d.data, "serv_accept"));
 	woolnet::serv_listen =   (woolnet_serv_t *(*)(int port))                   fsget((mfunc_t*)woolfs.d.data, "serv_listen");
@@ -92,7 +92,7 @@ int keh_init(kap_t k, ppackage aux)
 	
 	return OKAY;
 }
-ppackage keh_knock(ppackage in)
+ppackage keh_knock(ppackage in, void *aux)
 {
 	if (kaux_isforme(in.reci))
 		return kaux_act(kauxhdl, in);

@@ -16,7 +16,7 @@ void *kauxhdl;
 
 extern "C" {
 
-ppackage keh_knock(ppackage in);
+ppackage keh_knock(ppackage in, void *aux);
 int main(int argc, char **args);
 static const mfunc_t funcs[] = {
 		{(fptr_t)main,                    "main"},
@@ -32,7 +32,7 @@ int keh_init(kap_t k, ppackage aux)
 	
 	return OKAY;
 }
-ppackage keh_knock(ppackage in)
+ppackage keh_knock(ppackage in, void *aux)
 {
 	if (kaux_isforme(in.reci))
 		return kaux_act(kauxhdl, in);

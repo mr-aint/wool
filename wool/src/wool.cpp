@@ -61,7 +61,7 @@ extern "C" int keh_init(kap_t k, ppackage aux)
 	kaux_setobj(kauxhdl, NULL);
 	kaux_settyp(kauxhdl, NULL);
 	
-	ppackage woolfs = kap.knock(ppfuncs("::woolnet"));
+	ppackage woolfs = kap.knock(ppfuncs("::woolnet"), NULL);
 	if (woolfs.type != 'd') return ERRNCARE;
 	woolnet::serv_accept =   (int             (*)(woolnet_serv_t *, woolnet_clnt_t *, unsigned int *))(fsget((mfunc_t*)woolfs.d.data, "serv_accept"));
 	woolnet::serv_listen =   (woolnet_serv_t *(*)(int port))                   fsget((mfunc_t*)woolfs.d.data, "serv_listen");
@@ -86,9 +86,11 @@ extern "C" int keh_init(kap_t k, ppackage aux)
 	woolnet::wrap_srecv =    (int(*)(woolnet_serv_t*, void*, size_t))          fsget((mfunc_t*)woolfs.d.data, "wrap_srecv");
 	woolnet::wrap_ssend =    (int(*)(woolnet_serv_t*, void*, size_t))          fsget((mfunc_t*)woolfs.d.data, "wrap_ssend");
 	
+	
+	
 	return OKAY;
 }
-extern "C" ppackage keh_knock(ppackage in)
+extern "C" ppackage keh_knock(ppackage in, void *aux)
 {
 	if (kaux_isforme(in.reci))
 		return kaux_act(kauxhdl, in);
