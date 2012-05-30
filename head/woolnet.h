@@ -36,4 +36,5 @@ enum {
 	PRET_OKAY = 0,
 	PRET_PWRONG, // wrong password
 	PRET_NOUSER, // user does not exist
+	PRET_INTERN, // error inside.
 };
