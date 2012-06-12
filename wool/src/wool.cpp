@@ -106,17 +106,19 @@ void *client_handle(void *arg)
 	self->termn = -1;
 	self->username = NULL;
 	
+	printf("[wool client_handle(..)] CALL\n");
+	
 	unsigned char *buf = new unsigned char[woolnet::prot_maxlen()];
 	size_t len;
 	
 	len = woolnet::wrap_crecv(self, buf, woolnet::pack_clogin(NULL, 0, 0));
 	if (len<=0) {
 		printf("[wool client_handle(..) '%s' %02i] Failed to receive CLOGIN pack\n", self->username, self->termn);
-		return ERRNCARE;
+		return (void*)ERRNCARE;
 	}
 	if (buf[0] != PACK_CLOGIN) {
 		printf("[wool client_handle(..) '%s' %02i] Received unexpected non-CLOGIN packet\n", self->username, self->termn);
-		return ERRNCARE;
+		return (void*)ERRNCARE;
 	}
 	char *username = new char[32];
 	char *password = new char[32];
@@ -124,30 +126,30 @@ void *client_handle(void *arg)
 	printf("[wool client_handle(..) '%s' %02i] Client '%s' with password '%s'...\n", self->username, self->termn, username, password);
 	
 	// now talk to user module
-	std::string stuffpath = "::home::" + username;
+	std::string stuffpath = std::string("::home::") + username;
+	
 	ppackage userfs = kap.knock(ppfuncs((char*)stuffpath.c_str()), NULL);
 	if (userfs.type != 'd') {
 		printf("[wool client_handle(..) '%s' %02i] failed to obtain functions (via knocking)\n", self->username, self->termn);
-		len = woolnet::pack_slogin(buf, PRET_NOUSER, 0); // termn doesnt exist btw.
+		len = woolnet::pack_slogin(buf, PRET_NOUSER, 0); // termn 0 doesnt exist btw.
 		woolnet::wrap_csend(self, buf, len); // tell client authentication failed
-		return ERR;
+		return (void*)ERR;
 	}
 	int (*user_term_new)(char *) = (int(*)(char*)) fsget((mfunc_t*)userfs.d.data, "term_new");
 	if (!user_term_new) {
 		printf("[wool client_handle(..) '%s' %02i] 'term_new' function not found in this user\n", self->username, self->termn);
-		len = woolnet::pack_slogin(buf, PRET_INTERN, 0); // termn doesnt exist btw.
-		woolnet::wrap_csend(self, buf, len); // tell client authentication failed
-		return ERR;
+		len = woolnet::pack_slogin(buf, PRET_INTERN, 0); // i should have used ERRIMADERP here.
+		woolnet::wrap_csend(self, buf, len);
+		return (void*)ERR;
 	}
 	
-	self->termn = user_term_new();
-	printf("[wool client_handle(..) '%s' %02i] \n", self->username, self->termn);
-	
-	
-	
+	self->termn = user_term_new(self->passwd);
+	printf("[wool client_handle(..) '%s' %02i] termn = %02i\n", self->username, self->termn, self->termn);
 	
 	len = woolnet::pack_slogin(buf, PRET_OKAY, self->termn);
 	woolnet::wrap_csend(self, buf, len);
+	
+	// we have now a terminal and can start transferring keys/bytes
 	
 	while (1)
 	{
@@ -167,18 +169,29 @@ void *client_handle(void *arg)
 			int special, key;
 			woolnet::pack_unkey(buf, &special, &key);
 			if (special != 0) {
-				printf("[wool main(..) << PACK_KEY] special!=0 not supprted\n");
+				printf("[wool client_handle(..) '%s' %02i << PACK_KEY] special!=0 not supprted\n", self->username, self->termn);
 				continue;
 			}
 			//printf("key: (0x%02x) %c\n", key, key);
-			printf("[wool main(..) << PACK_KEY] 0x%02x key\n", key);
+			printf("[wool main(..) '%s' %02i << PACK_KEY] 0x%02x key\n", self->username, self->termn, key);
+			ppackage key_p;
+			key_p.type = 'D';
+			key_p.reci = (char*)stuffpath.c_str();
+			struct { int datachannel, key, special; } packet;
+			packet.datachannel = self->termn;
+			packet.key = key;
+			packet.special = special;
+			key_p.d.data = &packet;
+			key_p.d.len = sizeof(packet); // three integers
+			kap.knock(key_p, NULL);
+			
 			//putchar(key);
 			continue;
 		}
 		case PACK_CLOSE: {
-			char *reason;
+			char *reason = new char[128];
 			woolnet::pack_unclose(buf, reason);
-			printf("[wool main(..) << PACK_CLOSE] reason: %s\n", reason);
+			printf("[wool main(..) '%s' %02i << PACK_CLOSE] reason: %s\n", self->username, self->termn, reason);
 			return (void*)OKAY;
 		}
 		// default: // cannot get till here else it'd quit in the previous switch
@@ -203,19 +216,25 @@ extern "C" int main(int argc, char **args)
 	//unsigned char *buf = new unsigned char[woolnet::prot_maxlen()];
 	//unsigned char *bufcur; // current position in buffer
 	//size_t len;
-	woolnet_clnt_t *sample_client = new woolnet_clnt_t();
-	unsigned int blah_len;
-	printf("[wool main(..)] waiting..\n");
-	int clt = woolnet::serv_accept(serv, sample_client, &blah_len);
-	printf("got one\n");
-	if (clt<0) {
-		printf("[wool main(..)] failed to accept sample client\n");
-		return ERRBELOW;
-	}
+	while (1)
+	{
+		woolnet_clnt_t *sample_client = new woolnet_clnt_t();
+		unsigned int blah_len;
+		printf("[wool main(..)] waiting..\n");
+		int clt = woolnet::serv_accept(serv, sample_client, &blah_len);
+		printf("got one\n");
+		if (clt<0) {
+			printf("[wool main(..)] failed to accept client\n");
+			return ERRBELOW;
+		}
 
-	pthread_t th;
-	pthread_create(&th, NULL, client_handle, sample_client);
-	threads[sample_client] = th;
+		// garbage-collect threads eventually here.
+		
+		pthread_t th;
+		pthread_create(&th, NULL, client_handle, sample_client);
+		threads[sample_client] = th;
+
+	}
 	
 	return OKAY;
 

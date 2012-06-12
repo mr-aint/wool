@@ -191,9 +191,8 @@ int main(int argc, char **args)
 	while (1)
 	{
 		c = getchar();
-		//printf("DBG [youput main(..)] Gonna send %02x char..\n", c);
 		pthread_mutex_lock(&keysync);
-		if (c==EOF) exit(0);
+		if (c==EOF) { woolnet::clnt_shut(clnt); exit(0); }
 		
 		int len = woolnet::pack_key((unsigned char*)buf, 0, c);
 		int sent = woolnet::wrap_csend(clnt, buf, len);
