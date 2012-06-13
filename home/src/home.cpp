@@ -55,7 +55,7 @@ int userf_init(kap_t k, ppackage aux)
 // used to setup a ::home::username 
 //mfunc_t *gimme_meuserfuncs() { return meuserfuncs; }
 
-
+//mr-aint was here
 
 
 
